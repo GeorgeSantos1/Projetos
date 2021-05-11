@@ -1,0 +1,236 @@
+---
+title: "Análise de formas de adoçamento de sucos com aplicação de métodos não-paramétricos"
+date: "`r Sys.Date()`"
+author: George Anderson A. dos Santos
+output:
+  rmdformats::robobook:
+    thumbnails: false
+    lightbox: true
+    code_folding: hide
+    highlight: pygments
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introdução
+
+Pode-se dizer, com segurança, que a maioria das pessoas que usam estatísticas está mais familiarizada com análises paramétricas do que com análises não-paramétricas. Estatística paramétrica é um ramo da estatística que presume que os dados são provenientes de um tipo de distribuição de probabilidade e faz inferências sobre os parâmetros da distribuição. 
+
+
+Os testes paramétricos visam analisar a variabilidade dos resultados da variável dependente, em função da manipulação das variáveis independentes, de forma a que se possa refutar (ou não) a hipótese nula, a qual postula que os resultados da investigação são devidos, não aos efeitos previstos pela hipótese experimental, mas a diferenças aleatórias nos resultados, devidas a outras variáveis irrelevantes ou ao acaso.
+
+Geralmente, métodos paramétricos fazem mais suposições em comparação aos métodos da estatística não-paramétrica. Se essas suposições estiverem corretas, os métodos paramétricos poderão produzir estimativas mais precisas, possuindo maior potência estatística. Porém, se os dados não satisfazem as suposições feitas pelas técnicas tradicionais, métodos não-paramétricos de inferência estatística
+devem ser utilizados.
+
+Alguns requisitos para utilização de testes paramétricos:
+
+* Os resultados experimentais devem ser mensurados em escalas intervalares.
+* Os resultados devem normalmente distribuídos, isto é, devem seguir a curva normal.
+* deve haver homogeneidade da variância, isto é, a variabilidade dos resultados, para cada situação experimental, deve ser aproximadamente a mesma.
+* Tamanho amostral suficiente.
+
+A estatística não-paramétrica ou análise não-paramétrica é o termo utilizado para descrever um conjunto de técnicas utilizadas quando os métodos paramétricos não são os recomendados. As técnicas não-paramétricas assumem poucas ou nenhuma hipótese sobre a distribuição de probabilidade da população em estudo. Deste modo, traz uma vantagem na hora de realizar as análises adequadas de acordo com o objetivo do estudo. Portanto, os testes não paramétricos são conhecidos como testes livres de distribuição. Quando o estudo possui uma amostra muito pequena, dificilmente as suposições dos testes paramétricos serão atendidas, assim sendo recomendado o uso de algum método não-paramétrico.
+
+Os testes não-paramétricos são utilizados para analisar uma amostra ou comparar duas ou mais. É também utilizado para amostras pareadas, assim como analisar correlação e métodos de reamostragem.
+Os principais testes não-paramétricos utilizados são: teste do Sinal (ou teste da Mediana), teste de Wilcoxon, teste de Mann-Whitney, teste de Kruskal Wallis e teste de Friedman. Esses são apenas alguns testes não-paramétricos utilizados, sendo que cada um possui suas respectivas suposições e serão utilizados em situações específicas.
+
+Nesse texto os métodos serão utilizados para comparar formas de adoçamento de sucos em um estudo experimental
+
+### Descrição do experimento
+
+* Descrição
+
+O experimento consiste na degustação de suco. 3 recipientes de suco de um mesmo fruto foram preparados e adocicados de 3 formas distrintas (acuçar,adoçante e sem açucar) sendo consumidos de forma intercalada e avaliados com notas que variam de 5 a 10 de acordo com o seu sabor por seus degustadores.
+
+* Objetivo
+
+Verificar se existe diferença entre a média das notas com relação a forma de adoçamento do suco e se constatada a diferença, identificar entre quais níveis do tratamento (categorias de adoçamento) as mesmas ocorrem.
+
+* Metodologia
+    + Delineamento de Blocos Casualizados
+    + 10 Blocos (Pessoas) e 3 Tratamentos (formas de adoçamento)
+
+* Variáveis
+    + Degustador: representa a identificação de cada degustador (varia de 1 até 10)
+    + Tratamento: representa as formas de adoçamento utilizadas (açucar,adoçante e natural)
+    + Nota: representa as notas dadas a cada tipo de tratamento por cada degustador (varia de 5 até 10)
+
+
+## Aplicação
+
+
+### Carregando pacotes e dados utilizados
+
+> **Pacotes utilizados**
+
+```{r pacotes,message=FALSE,warning=FALSE}
+
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(rstatix)
+library(PMCMRplus)
+library(sysfonts)
+library(extrafont)
+library(showtext)
+library(ez)
+
+font_add_google('Roboto Slab','Roboto Slab')
+showtext_auto()
+```
+
+> **Dados utilizados**
+
+```{r}
+Dataset <- readr::read_delim("df/Dataset.csv", ";",
+                             col_types = cols(Degustador = col_factor(), 
+                                              Tratamento = col_factor(),
+                                              Nota = col_number()),
+                             locale = locale(encoding = "WINDOWS-1252"), 
+                             trim_ws = TRUE)
+Dataset
+```
+
+### Análise descritiva
+
+> **Algumas medidas descritivas sumarizadas para cada um dos grupos**
+
+```{r}
+Dataset %>% group_by(Tratamento) %>%
+  rstatix::get_summary_stats(Nota,
+                             show = c("min","max","mean", "sd", "median", "iqr"))
+```
+
+Com base nas medidas descritivas é possível afirmar que o suco adoçicado com açucar obteve maior média de avaliação e menor dispersão entre as notas recebidas.
+
+> **Avaliação gráfica**
+
+```{r}
+Dataset %>%
+  ggplot(aes(y=Nota,x=Tratamento,fill = Tratamento)) +
+  geom_boxplot() +
+  labs(title = "Distribuição das notas por tipo de Tratamento") +
+  theme_minimal() +
+  scale_fill_grey() +
+  theme(legend.position="none",
+        text = element_text(family='Roboto Slab',size = 30)) +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=1,
+               binwidth = 0.2)
+```
+
+Analisando o boxplot pode-se observar uma grande diferença entre a distribuição das notas, indicando possível violação do pressuposto de *esfericidade* e/ou *homocedasticidade*.
+
+> **Identificação de pontos discrepantes (outliers) por tratamento**
+
+```{r}
+Dataset %>% group_by(Tratamento) %>% identify_outliers(Nota)
+```
+
+Foram identificados 2 outliers nas notas para o adoçamento açucar. Dado que os outliers não foram considerados extremos, os mesmos foram mantidos para análises subsequentes.
+
+> **Avaliação do pressuposto de normalidade**
+
+```{r}
+Dataset  %>% 
+  group_by(Tratamento) %>%
+  shapiro_test(Nota) %>%
+  mutate(statistic = round(statistic,3),
+         p = round(p,3)) %>%
+  rename(Variável = variable,
+         'P-Valor' = p)
+
+```
+
+Com base no **p-valor** ($\alpha = 5\%$) é possível concluir que as notas dos grupos "açucar" e "natural" não são normalmente distribuidas.
+
+> **Avaliação do pressuposto de homocedasticidade**
+
+```{r}
+# Modelo ANOVA para medidas repetidas (método paramétrico recomendado)
+modelo <- ezANOVA(data = Dataset,        # dados utilizados
+                  dv = Nota,             # variável dependente
+                  wid = Degustador,      # variável identificadora (bloco)
+                  within = Tratamento,   # variável preditora (tratamento)
+                  detailed = TRUE,
+                  type= 3,
+                  return_aov = TRUE)
+
+# Outra forma de Calcular:
+  #* modelo <- aov(Nota ~ Tratamento + Degustador,data=Dataset)
+
+# retendo os resíduos do modelo
+res.modelo <- (proj(modelo$aov)[[3]][, "Residuals"])
+
+# Teste de Bartlett
+bartlett.test(res.modelo ~ Dataset$Tratamento)
+```
+
+Com base no **p-valor** e considerando $\alpha$ = 5\% não temos evidência para rejeitar a hipótese nula, ou seja, não houve violação do pressuposto de homocedasticidade.
+
+> **Avaliação do pressuposto de esfericidade**
+
+```{r}
+modelo$`Mauchly's Test for Sphericity`
+```
+
+Considerando um nível de significância de 5\% não temos evidência para rejeitar a hipótese nula, ou seja, não houve violação do pressuposto de esfericidade.
+
+\vspace{6cm}
+***
+\vspace{6cm}
+
+Com base no delineamento do experimento (delineamento de blocos casualizados), tamanho amostral e resultados descritivos obtidos, o teste de Friedman foi escolhido para comparação dos grupos.
+
+> **Teste de Friedman**
+
+```{r}
+Dataset %>% friedman_test(Nota ~ Tratamento | Degustador)
+```
+
+Considerando $\alpha$ = 5\% temos evidência para rejeitar a hipótese nula, ou seja, existe diferença entre as formas de adoçamento com relação as notas recebidas (mediana e/ou distribuição das notas).
+
+**PostHoc**
+
+> **Dunn-Bonferroni**
+
+```{r}
+PMCMRplus::frdAllPairsSiegelTest(Dataset$Nota,
+                                 Dataset$Tratamento,
+                                 Dataset$Degustador,
+                                 p.adjust = "bonferroni")
+```
+
+> **Teste de Wilcox com correção de Bonferroni**
+
+```{r}
+Dataset %>% rstatix::wilcox_test(Nota ~ Tratamento,
+                                 paired = TRUE,
+                                 p.adjust.method = "bonferroni")
+```
+
+Com um nível de significância de 5\% é possível afirmar que as notas das formas de adoçamento 'açucar' e 'adoçante' diferem para ambos os métodos utilizados.
+
+## Conclusão
+
+* Com 95\% de confiança é possível afirmar que houve diferença entre as formas de adoçamento de suco (mediana e/ou distribuição das notas das formas de adoçamento diferem).  
+
+* Pelos testes de Dunn-Bonferoni e Wilcox (com correção de bonferroni) considerando 95\% de confiança as formas de adoçamento que diferiram foram "açucar" e "Adoçante", logo ; $açucar^{a}$, $natural^{a,b}$ e $adoçante^{b}$.
+
+## Referências
+
+1. *estatística paramétrica* in Infopédia [em linha]. Porto: Porto Editora, 2003-2021. [consult. 2021-05-11 04:34:31]. Disponível na Internet: https://www.infopedia.pt/$estatistica-parametrica.
+
+2. Rocha, K. R. da, & Bacelar Júnior, A. J. (2018). Anova Medidas Repetidas E Seus Pressupostos: Análise Passo a Passo De Um Experimento. *Revista Eletrônica Perspectivas Da Ciência e Tecnologia - ISSN: 1984-5693, 10, 29.* https://doi.org/10.22407/1984-5693.2018.v10.p.29-51.
+
+3. *como escolher entre um teste nao parametrico e um teste parametrico*. Minitab, 2019. Disponível na internet: < https://blog.minitab.com/pt/como-escolher-entre-um-teste-nao-parametrico-e-um-teste-parametrico >
+
+
+
+
+
+
+
